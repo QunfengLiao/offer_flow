@@ -38,14 +38,75 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # 1. 检查 GitHub Secrets 是否真的存在
+      - name: Check SSH Secrets
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+        run: |
+          if [ -z "$SERVER_HOST" ]; then
+            echo "SERVER_HOST is empty"
+            exit 1
+          fi
+
+          if [ -z "$SERVER_USER" ]; then
+            echo "SERVER_USER is empty"
+            exit 1
+          fi
+
+          if [ -z "$SERVER_SSH_KEY" ]; then
+            echo "SERVER_SSH_KEY is empty"
+            exit 1
+          fi
+
+          echo "SERVER_HOST exists"
+          echo "SERVER_USER exists"
+          echo "SERVER_SSH_KEY exists"
+          echo "SSH key length: ${#SERVER_SSH_KEY}"
+
+      # 2. 验证 GitHub 中保存的是不是合法私钥
+      - name: Validate SSH Private Key
+        env:
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+        run: |
+          printf '%s\n' "$SERVER_SSH_KEY" > /tmp/offerflow_key
+          chmod 600 /tmp/offerflow_key
+
+          ssh-keygen -y -f /tmp/offerflow_key > /dev/null
+
+          echo "SSH private key is valid"
+
+      # 3. 不经过 appleboy，直接测试 GitHub Runner 能不能 SSH 到服务器
+      - name: Test SSH Connection
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          ssh-keyscan -H "$SERVER_HOST" >> ~/.ssh/known_hosts
+
+          ssh \
+            -i /tmp/offerflow_key \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o ConnectTimeout=10 \
+            "$SERVER_USER@$SERVER_HOST" \
+            "echo 'SSH connection successful'"
+
+      # 4. 正式部署
       - name: Deploy to Server
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
+          port: 22
           script: |
             cd /opt/offer_flow
+
             docker compose pull
 
             docker compose up -d
