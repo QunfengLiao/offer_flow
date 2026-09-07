@@ -72,12 +72,12 @@ export type DashboardProgress = {
   weeklyTrend: { key: string; label: string; count: number }[];
 };
 
-export type DashboardTrendPoint = { key: string; label: string; count: number };
+export type DashboardTrendPoint = { key: string; label: string; count: number; start: string; end: string };
 
 export type DashboardAnalytics = {
   statusDistribution: { status: ApplicationStatus; label: string; count: number }[];
   trends: { week: DashboardTrendPoint[]; month: DashboardTrendPoint[]; year: DashboardTrendPoint[] };
-  categoryDistribution: { label: string; count: number }[];
+  categoryDistribution: { categoryId: string | "UNCATEGORIZED"; label: string; count: number }[];
 };
 
 function serializeApplication(application: ApplicationWithDetails | ApplicationListWithDetails): ApplicationDto {
@@ -330,6 +330,8 @@ type ListOptions = {
   attention?: boolean;
   favorite?: boolean;
   categoryId?: string | "UNCATEGORIZED";
+  appliedFrom?: Date;
+  appliedTo?: Date;
   sort?: ApplicationSort;
   direction?: "asc" | "desc";
   page: number;
@@ -368,7 +370,11 @@ export async function listApplicationsForUser(userId: string, options: ListOptio
     userId,
     ...(options.query ? { OR: [{ company: { name: { contains: options.query } } }, { positions: { some: { title: { contains: options.query } } } }] } : {}),
     ...(currentStatusFilter ? { currentStatus: currentStatusFilter } : {}),
-    ...(options.attention ? { appliedAt: { lte: endOfDay(subDays(new Date(), 7)) } } : {}),
+    ...((options.appliedFrom || options.appliedTo || options.attention) ? { appliedAt: {
+      ...(options.appliedFrom ? { gte: options.appliedFrom } : {}),
+      ...(options.appliedTo ? { lt: options.appliedTo } : {}),
+      ...(options.attention ? { lte: endOfDay(subDays(new Date(), 7)) } : {}),
+    } } : {}),
     ...((options.favorite || options.categoryId) ? { company: {
       ...(options.favorite ? { isFavorite: true } : {}),
       ...(options.categoryId === "UNCATEGORIZED" ? { categoryId: null } : options.categoryId ? { categoryId: options.categoryId } : {}),
@@ -473,7 +479,7 @@ export async function deleteApplicationForUser(userId: string, id: string) {
   return result.count > 0;
 }
 
-type DashboardCategorySummary = { category: { name: string } | null; _count: { applications: number } };
+type DashboardCategorySummary = { category: { id: string; name: string } | null; _count: { applications: number } };
 type DashboardStatusCount = { currentStatus: ApplicationStatus; _count: { _all: number } };
 type DashboardTrendCounts = { week: number[]; month: number[]; year: number[]; progressWeek: number[] };
 type DashboardAggregate = {
@@ -598,7 +604,7 @@ export async function getDashboardForUser(userId: string) {
     getDashboardTrendCounts(userId, now),
     prisma.company.findMany({
       where: { userId },
-      select: { category: { select: { name: true } }, _count: { select: { applications: true } } },
+      select: { category: { select: { id: true, name: true } }, _count: { select: { applications: true } } },
     }),
   ]);
   const progress = buildDashboardProgress({ total: aggregate.total, assessmentCount: aggregate.assessmentCount, interviewCount: aggregate.interviewCount, offerCount: aggregate.offerCount, rejected: aggregate.rejected, progressedCount: aggregate.progressedCount }, trendCounts, now);
@@ -627,20 +633,23 @@ function buildDashboardAnalytics(statusCounts: DashboardStatusCount[], trendCoun
   const formatWeekLabel = (date: Date) => date.getFullYear() === now.getFullYear() ? `${date.getMonth() + 1}/${date.getDate()}` : `${String(date.getFullYear()).slice(-2)}年${date.getMonth() + 1}/${date.getDate()}`;
   const ranges = getDashboardRanges(now);
   const trends = {
-    week: ranges.week.map((range, index) => ({ key: range.start.toISOString(), label: formatWeekLabel(range.start), count: trendCounts.week[index] ?? 0 })),
-    month: ranges.month.map((range, index) => ({ key: range.start.toISOString(), label: formatMonthLabel(range.start), count: trendCounts.month[index] ?? 0 })),
-    year: ranges.year.map((range, index) => ({ key: range.start.toISOString(), label: `${range.start.getFullYear()}年`, count: trendCounts.year[index] ?? 0 })),
+    week: ranges.week.map((range, index) => ({ key: range.start.toISOString(), label: formatWeekLabel(range.start), count: trendCounts.week[index] ?? 0, start: range.start.toISOString(), end: range.end.toISOString() })),
+    month: ranges.month.map((range, index) => ({ key: range.start.toISOString(), label: formatMonthLabel(range.start), count: trendCounts.month[index] ?? 0, start: range.start.toISOString(), end: range.end.toISOString() })),
+    year: ranges.year.map((range, index) => ({ key: range.start.toISOString(), label: `${range.start.getFullYear()}年`, count: trendCounts.year[index] ?? 0, start: range.start.toISOString(), end: range.end.toISOString() })),
   };
-  const categoryCounts = new Map<string, number>();
+  const categoryCounts = new Map<string, { categoryId: string | "UNCATEGORIZED"; label: string; count: number }>();
   categorySummaries.forEach((company) => {
     if (company._count.applications === 0) return;
+    const categoryId = company.category?.id ?? "UNCATEGORIZED";
     const label = company.category?.name ?? "未分类";
-    categoryCounts.set(label, (categoryCounts.get(label) ?? 0) + company._count.applications);
+    const current = categoryCounts.get(categoryId) ?? { categoryId, label, count: 0 };
+    current.count += company._count.applications;
+    categoryCounts.set(categoryId, current);
   });
   return {
     statusDistribution,
     trends,
-    categoryDistribution: [...categoryCounts.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0], "zh-CN")).map(([label, count]) => ({ label, count })),
+    categoryDistribution: [...categoryCounts.values()].sort((left, right) => right.count - left.count || left.label.localeCompare(right.label, "zh-CN")),
   };
 }
 

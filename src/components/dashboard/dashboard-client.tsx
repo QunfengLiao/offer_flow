@@ -8,7 +8,7 @@ import { App as AntdApp, Button, Card, Col, Dropdown, Empty, Flex, Input, Modal,
 import type { ColumnsType } from "antd/es/table";
 import type { SorterResult } from "antd/es/table/interface";
 import * as echarts from "echarts/core";
-import type { EChartsOption } from "echarts";
+import type { ECElementEvent, EChartsOption } from "echarts";
 import { BarChart, LineChart, PieChart } from "echarts/charts";
 import { GraphicComponent, GridComponent, LegendComponent, TooltipComponent } from "echarts/components";
 import { CanvasRenderer } from "echarts/renderers";
@@ -38,6 +38,7 @@ type DashboardStats = {
 
 type ApplicationList = { items: ApplicationDto[]; total: number; favoriteCompanyCount: number; page: number; pageSize: number; pageCount: number };
 type DashboardFilter = ApplicationStatusFilter | "ALL";
+type AppliedDateFilter = { from: string; to: string; label: string };
 
 function relativeActivity(date: string) {
   const elapsedMinutes = Math.max(0, Math.floor((Date.now() - new Date(date).getTime()) / 60000));
@@ -91,18 +92,23 @@ function AnalyticsCard({ title, description, children, action, className = "" }:
   </Card>;
 }
 
-function EChartsChart({ option, className = "", ariaLabel }: { option: EChartsOption; className?: string; ariaLabel: string }) {
+function EChartsChart({ option, className = "", ariaLabel, onClick }: { option: EChartsOption; className?: string; ariaLabel: string; onClick?: (params: ECElementEvent) => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<echarts.ECharts | null>(null);
+  const clickHandlerRef = useRef(onClick);
+  clickHandlerRef.current = onClick;
 
   useEffect(() => {
     if (!containerRef.current) return;
     const chart = echarts.init(containerRef.current, undefined, { renderer: "canvas" });
     chartRef.current = chart;
+    const handleClick = (params: ECElementEvent) => clickHandlerRef.current?.(params);
+    chart.on("click", handleClick);
     const resizeObserver = new ResizeObserver(() => chart.resize());
     resizeObserver.observe(containerRef.current);
     return () => {
       resizeObserver.disconnect();
+      chart.off("click", handleClick);
       chart.dispose();
       chartRef.current = null;
     };
@@ -115,7 +121,7 @@ function EChartsChart({ option, className = "", ariaLabel }: { option: EChartsOp
   return <div ref={containerRef} className={`echarts-chart ${className}`} role="img" aria-label={ariaLabel} />;
 }
 
-function StatusDistributionChart({ analytics, total }: { analytics: DashboardAnalytics; total: number }) {
+function StatusDistributionChart({ analytics, total, onStatusClick }: { analytics: DashboardAnalytics; total: number; onStatusClick: (status: ApplicationStatus) => void }) {
   const visibleData = analytics.statusDistribution.filter((item) => item.count > 0);
   const option: EChartsOption = {
     animation: true,
@@ -152,7 +158,7 @@ function StatusDistributionChart({ analytics, total }: { analytics: DashboardAna
   };
   return <AnalyticsCard title="投递状态分布" description="按当前状态统计" className="status-analytics-card">
     {visibleData.length === 0 ? <Empty className="analytics-empty" image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无投递数据" /> : <div className="status-chart-wrap">
-      <EChartsChart option={option} className="status-echarts-chart" ariaLabel={`当前投递状态分布，共 ${total} 条`} />
+      <EChartsChart option={option} className="status-echarts-chart" ariaLabel={`当前投递状态分布，共 ${total} 条`} onClick={(params) => { const item = typeof params.dataIndex === "number" ? visibleData[params.dataIndex] : undefined; if (item) onStatusClick(item.status); }} />
       <div className="status-chart-center" aria-hidden="true">
         <span className="status-chart-total">{total}</span>
         <span className="status-chart-caption">条投递</span>
@@ -161,7 +167,7 @@ function StatusDistributionChart({ analytics, total }: { analytics: DashboardAna
   </AnalyticsCard>;
 }
 
-function TrendChart({ analytics }: { analytics: DashboardAnalytics }) {
+function TrendChart({ analytics, onTrendClick }: { analytics: DashboardAnalytics; onTrendClick: (point: DashboardAnalytics["trends"][TrendRange][number]) => void }) {
   const [range, setRange] = useState<TrendRange>("month");
   const series = analytics.trends[range];
   const maxCount = Math.max(1, ...series.map((item) => item.count));
@@ -181,18 +187,18 @@ function TrendChart({ analytics }: { analytics: DashboardAnalytics }) {
   return <AnalyticsCard title="投递趋势" description="按投递日期统计" action={<div className="trend-range-tabs" role="tablist" aria-label="投递趋势时间范围">
     {(["week", "month", "year"] as TrendRange[]).map((item) => <button type="button" role="tab" aria-selected={range === item} className={`trend-range-tab${range === item ? " is-active" : ""}`} key={item} onClick={() => setRange(item)}>{item === "week" ? "周" : item === "month" ? "月" : "年"}</button>)}
   </div>} className="trend-analytics-card">
-    <div className="trend-chart-wrap"><EChartsChart option={option} className="trend-echarts-chart" ariaLabel="投递数量趋势" /></div>
+    <div className="trend-chart-wrap"><EChartsChart option={option} className="trend-echarts-chart" ariaLabel="投递数量趋势" onClick={(params) => { const point = typeof params.dataIndex === "number" ? series[params.dataIndex] : undefined; if (point) onTrendClick(point); }} /></div>
   </AnalyticsCard>;
 }
 
-function CategoryDistributionChart({ analytics, total }: { analytics: DashboardAnalytics; total: number }) {
+function CategoryDistributionChart({ analytics, total, onCategoryClick }: { analytics: DashboardAnalytics; total: number; onCategoryClick: (categoryId: string | "UNCATEGORIZED") => void }) {
   const maxCount = Math.max(1, ...analytics.categoryDistribution.map((item) => item.count));
   return <AnalyticsCard title="公司分类分布" description="按投递数量统计" className="category-analytics-card">
     {analytics.categoryDistribution.length === 0 ? <Empty className="analytics-empty" image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无公司分类数据" /> : <div className="category-distribution-list" role="list" aria-label="公司分类投递分布">
       {analytics.categoryDistribution.map((item, index) => {
         const color = categoryChartColors[index % categoryChartColors.length];
         const percentage = (item.count / maxCount) * 100;
-        return <div className="category-distribution-row" role="listitem" key={item.label}>
+        return <div className="category-distribution-row" role="button" tabIndex={0} key={item.categoryId} onClick={() => onCategoryClick(item.categoryId)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onCategoryClick(item.categoryId); } }}>
           <span className="category-distribution-label" title={item.label}>{item.label}</span>
           <div className="category-distribution-bar" role="progressbar" aria-label={`${item.label}：${item.count} 条投递`} aria-valuemin={0} aria-valuemax={maxCount} aria-valuenow={item.count}>
             <span className="category-distribution-bar-fill" style={{ width: `${percentage}%`, backgroundColor: color }} />
@@ -205,11 +211,11 @@ function CategoryDistributionChart({ analytics, total }: { analytics: DashboardA
   </AnalyticsCard>;
 }
 
-function DashboardAnalytics({ analytics, total }: { analytics: DashboardAnalytics; total: number }) {
+function DashboardAnalytics({ analytics, total, onStatusClick, onTrendClick, onCategoryClick }: { analytics: DashboardAnalytics; total: number; onStatusClick: (status: ApplicationStatus) => void; onTrendClick: (point: DashboardAnalytics["trends"][TrendRange][number]) => void; onCategoryClick: (categoryId: string | "UNCATEGORIZED") => void }) {
   return <Row gutter={[16, 16]} className="dashboard-analytics-grid">
-    <Col xs={24} lg={8}><StatusDistributionChart analytics={analytics} total={total} /></Col>
-    <Col xs={24} lg={8}><TrendChart analytics={analytics} /></Col>
-    <Col xs={24} lg={8}><CategoryDistributionChart analytics={analytics} total={total} /></Col>
+    <Col xs={24} lg={8}><StatusDistributionChart analytics={analytics} total={total} onStatusClick={onStatusClick} /></Col>
+    <Col xs={24} lg={8}><TrendChart analytics={analytics} onTrendClick={onTrendClick} /></Col>
+    <Col xs={24} lg={8}><CategoryDistributionChart analytics={analytics} total={total} onCategoryClick={onCategoryClick} /></Col>
   </Row>;
 }
 
@@ -228,6 +234,7 @@ export function DashboardClient({ user, initialStats, initialList, initialCatego
   const [attention, setAttention] = useState(false);
   const [favorite, setFavorite] = useState(false);
   const [categoryId, setCategoryId] = useState<string | "ALL" | "UNCATEGORIZED">("ALL");
+  const [appliedDateFilter, setAppliedDateFilter] = useState<AppliedDateFilter | null>(null);
   const [categories, setCategories] = useState(initialCategories);
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [categoryManagerCreate, setCategoryManagerCreate] = useState(false);
@@ -245,7 +252,7 @@ export function DashboardClient({ user, initialStats, initialList, initialCatego
   const listRequestId = useRef(0);
   const detailRequestId = useRef(0);
   const recordsSectionRef = useRef<HTMLElement>(null);
-  const lastLoadedListState = useRef(`1|${initialList.pageSize}|statusPriority|asc|false|false|ALL|ALL|`);
+  const lastLoadedListState = useRef(`1|${initialList.pageSize}|statusPriority|asc|false|false|ALL|ALL|||`);
   const { message } = AntdApp.useApp();
 
   const loadDashboard = async () => {
@@ -276,6 +283,10 @@ export function DashboardClient({ user, initialStats, initialList, initialCatego
       if (attention) params.set("attention", "true");
       if (favorite) params.set("favorite", "true");
       if (categoryId !== "ALL") params.set("categoryId", categoryId);
+      if (appliedDateFilter) {
+        params.set("appliedFrom", appliedDateFilter.from);
+        params.set("appliedTo", appliedDateFilter.to);
+      }
       const response = await fetch(`/api/applications?${params.toString()}`);
       const body = await response.json();
       if (response.ok && requestId === listRequestId.current) setList(body.data);
@@ -294,13 +305,13 @@ export function DashboardClient({ user, initialStats, initialList, initialCatego
 
   // The server has already supplied initialList. Subsequent state changes refresh it.
   useEffect(() => {
-    const requestState = `${page}|${pageSize}|${sort}|${direction}|${attention}|${favorite}|${categoryId}|${status}|${debouncedQuery}`;
+    const requestState = `${page}|${pageSize}|${sort}|${direction}|${attention}|${favorite}|${categoryId}|${status}|${debouncedQuery}|${appliedDateFilter?.from ?? ""}|${appliedDateFilter?.to ?? ""}`;
     if (lastLoadedListState.current === requestState) return;
     lastLoadedListState.current = requestState;
     void loadList();
     // loadList deliberately follows the filter state rather than its recreated function identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pageSize, sort, direction, attention, favorite, categoryId, status, debouncedQuery]);
+  }, [page, pageSize, sort, direction, attention, favorite, categoryId, status, debouncedQuery, appliedDateFilter]);
 
   const refresh = () => { void loadDashboard(); void loadList(); };
   const openCreate = () => { setDialogOpen(true); };
@@ -322,8 +333,21 @@ export function DashboardClient({ user, initialStats, initialList, initialCatego
       if (requestId === detailRequestId.current) message.error("详情加载失败，请检查网络后重试");
     }
   };
-  const hasFilterSummary = Boolean(query.trim()) || status !== "ALL" || categoryId !== "ALL";
-  const clearFilters = () => { setQuery(""); setStatus("ALL"); setAttention(false); setFavorite(false); setCategoryId("ALL"); setPage(1); };
+  const hasFilterSummary = Boolean(query.trim()) || status !== "ALL" || categoryId !== "ALL" || Boolean(appliedDateFilter);
+  const clearFilters = () => { setQuery(""); setStatus("ALL"); setAttention(false); setFavorite(false); setCategoryId("ALL"); setAppliedDateFilter(null); setPage(1); };
+  const selectStatusFromChart = (nextStatus: ApplicationStatus) => {
+    setStatus((current) => current === nextStatus ? "ALL" : nextStatus);
+    setAttention(false);
+    setPage(1);
+  };
+  const selectTrendFromChart = (point: DashboardAnalytics["trends"][TrendRange][number]) => {
+    setAppliedDateFilter((current) => current?.from === point.start && current.to === point.end ? null : { from: point.start, to: point.end, label: point.label });
+    setPage(1);
+  };
+  const selectCategoryFromChart = (nextCategoryId: string | "UNCATEGORIZED") => {
+    setCategoryId((current) => current === nextCategoryId ? "ALL" : nextCategoryId);
+    setPage(1);
+  };
   const selectView = (next: "ALL" | "ATTENTION" | "FAVORITES") => {
     setStatus("ALL");
     setAttention(next === "ATTENTION");
@@ -464,7 +488,7 @@ export function DashboardClient({ user, initialStats, initialList, initialCatego
     </header>
 
     <main className="dashboard-content">
-      <div className="dashboard-analytics-wrap"><DashboardAnalytics analytics={stats.analytics} total={stats.total} /></div>
+      <div className="dashboard-analytics-wrap"><DashboardAnalytics analytics={stats.analytics} total={stats.total} onStatusClick={selectStatusFromChart} onTrendClick={selectTrendFromChart} onCategoryClick={selectCategoryFromChart} /></div>
 
       <div className="dashboard-main-row">
         <section ref={recordsSectionRef} className="dashboard-list-col" aria-labelledby="application-records-heading">
@@ -507,6 +531,7 @@ export function DashboardClient({ user, initialStats, initialList, initialCatego
               {query.trim() && <Tag closable onClose={() => { setQuery(""); setPage(1); }}>搜索：{query.trim()}</Tag>}
               {status !== "ALL" && <Tag closable onClose={() => { setStatus("ALL"); setPage(1); }}>状态：{statusFilterLabel(status)}</Tag>}
               {categoryId !== "ALL" && <Tag closable onClose={() => { setCategoryId("ALL"); setPage(1); }}>分类：{categoryId === "UNCATEGORIZED" ? "未分类" : categories.find((item) => item.id === categoryId)?.name}</Tag>}
+              {appliedDateFilter && <Tag closable onClose={() => { setAppliedDateFilter(null); setPage(1); }}>投递日期：{appliedDateFilter.label}</Tag>}
               <Button type="link" size="small" onClick={clearFilters}>清除筛选</Button>
             </Space></div>}
             <Table<ApplicationDto> className="dashboard-table" rowKey="id" size="middle" loading={loading} columns={columns} dataSource={list.items} pagination={false} tableLayout="fixed" scroll={{ x: 1054 }} onChange={handleTableChange} locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={hasFilterSummary || attention || favorite ? "没有符合条件的投递" : "还没有投递记录"} /> }} rowClassName={(application, index) => `${index === 0 || list.items[index - 1]?.currentStatus !== application.currentStatus ? "application-table-row status-group-start" : "application-table-row"} status-group-${application.currentStatus.toLowerCase()}`} onRow={(application) => ({ onClick: () => { void openApplicationDetails(application); }, style: { cursor: "pointer" } })} />

@@ -8,6 +8,8 @@ export async function GET(request: Request) {
   try {
     const user = await requireUser();
     const { searchParams } = new URL(request.url);
+    const appliedFrom = parseDateFilter(searchParams.get("appliedFrom"));
+    const appliedTo = parseDateFilter(searchParams.get("appliedTo"));
     const page = Math.max(1, Number(searchParams.get("page") || 1));
     const pageSize = Math.min(50, Math.max(1, Number(searchParams.get("pageSize") || 10)));
     const statusValue = searchParams.get("status");
@@ -27,6 +29,8 @@ export async function GET(request: Request) {
       attention: searchParams.get("attention") === "true",
       favorite: searchParams.get("favorite") === "true",
       categoryId: searchParams.get("categoryId") === "UNCATEGORIZED" ? "UNCATEGORIZED" : searchParams.get("categoryId")?.trim() || undefined,
+      appliedFrom,
+      appliedTo,
       sort,
       direction,
       page,
@@ -36,6 +40,12 @@ export async function GET(request: Request) {
   } catch (error) {
     return errorResponse(error);
   }
+}
+
+function parseDateFilter(value: string | null) {
+  if (!value) return undefined;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
 }
 
 export async function POST(request: Request) {
