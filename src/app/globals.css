@@ -1374,3 +1374,140 @@ a { color: inherit; }
   .company-external-icon,
   .dashboard-table .ant-table-column-sorter { transition: none; }
 }
+
+/* Mobile layout pass: make the dashboard a vertical, touch-first surface.
+   Desktop keeps the full data table; mobile keeps the scan-critical columns
+   and leaves the rest of each record in the detail drawer. */
+@media (max-width: 767px) {
+  .dashboard-header {
+    height: 58px;
+    padding-inline: 14px;
+  }
+
+  .dashboard-brand { gap: 8px; }
+  .dashboard-brand-mark { width: 30px; height: 30px; }
+  .dashboard-brand-name { font-size: 15px; }
+  .dashboard-user { gap: 2px; }
+  .dashboard-user-copy { max-width: 104px; overflow: hidden; }
+  .dashboard-user-copy .ant-typography-strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .dashboard-header .ant-btn { min-width: 40px; padding-inline: 7px; }
+  .dashboard-header .ant-btn > .anticon { margin-inline-end: 0; }
+  .dashboard-header .ant-btn > span:last-child { display: none; }
+
+  .dashboard-content { padding: 16px 12px 28px; }
+  .dashboard-analytics-grid { margin-inline: 0 !important; }
+  .dashboard-analytics-grid > .ant-col { padding-inline: 0 !important; }
+  .dashboard-analytics-grid > .ant-col > .analytics-card {
+    min-height: 272px;
+    border-radius: 15px;
+  }
+  .analytics-card .ant-card-body { padding: 18px 16px 16px; }
+  .analytics-card-heading { gap: 8px; }
+  .analytics-card-heading h4,
+  .analytics-card-heading .ant-typography h4 { font-size: 17px; }
+  .analytics-card-heading .ant-typography-secondary { margin-top: 3px; font-size: 11px; }
+  .status-echarts-chart,
+  .trend-echarts-chart { min-height: 202px; }
+  .category-analytics-card .ant-card-body { min-height: 272px; }
+  .category-distribution-list { row-gap: 7px; padding-top: 8px; }
+  .category-distribution-row {
+    grid-template-columns: 58px minmax(0, 1fr) 24px 34px;
+    column-gap: 8px;
+    min-height: 21px;
+  }
+
+  .dashboard-main-row { margin-top: 16px; }
+  .dashboard-table-card { border-radius: 15px; }
+  .dashboard-table-toolbar { padding: 16px 14px 14px; }
+  .dashboard-table-toolbar-top {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .dashboard-table-heading { width: auto; }
+  .dashboard-table-heading .ant-typography h4,
+  .dashboard-table-heading h4 { font-size: 19px; }
+  .dashboard-table-actions {
+    width: 100%;
+    justify-content: stretch;
+    gap: 6px;
+  }
+  .dashboard-table-actions .ant-btn { flex: 1 1 0; min-width: 0; padding-inline: 6px; }
+  .dashboard-table-actions > .ant-btn-primary { flex: 1.25 1 0; }
+  .dashboard-table-toolbar-bottom {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 11px;
+    margin-top: 14px;
+  }
+  .dashboard-view-tabs { width: 100%; }
+  .dashboard-view-tab { min-height: 34px; font-size: 12px; }
+  .dashboard-table-filters {
+    width: 100%;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .dashboard-table-filters .ant-input-affix-wrapper,
+  .dashboard-table-filters .ant-select,
+  .dashboard-table-filters .filter-status,
+  .dashboard-table-filters .filter-category,
+  .dashboard-table-filters .filter-sort,
+  .dashboard-table-filters .ant-btn {
+    width: 100%;
+  }
+  .dashboard-table-filters .ant-input-affix-wrapper,
+  .dashboard-table-filters .ant-select,
+  .dashboard-table-filters .ant-btn { height: 40px; }
+
+  /* Hide low-priority columns instead of forcing the whole desktop table
+     into a horizontal rail. The drawer remains the source of truth for all
+     fields, including exact dates and recent activity. */
+  .dashboard-table .ant-table-container,
+  .dashboard-table .ant-table-content { overflow-x: hidden; }
+  .dashboard-table .ant-table,
+  .dashboard-table .ant-table table { width: 100% !important; min-width: 0 !important; }
+  .dashboard-table .ant-table col:nth-child(1) { width: 43% !important; }
+  .dashboard-table .ant-table col:nth-child(2) { width: 34% !important; }
+  .dashboard-table .ant-table col:nth-child(3) { width: 23% !important; }
+  .dashboard-table .ant-table col:nth-child(4),
+  .dashboard-table .ant-table col:nth-child(5) { display: none; width: 0 !important; }
+  .dashboard-table .ant-table col:nth-child(6) { width: 46px !important; }
+  .dashboard-table .ant-table-thead > tr > th:nth-child(4),
+  .dashboard-table .ant-table-tbody > tr > td:nth-child(4),
+  .dashboard-table .ant-table-thead > tr > th:nth-child(5),
+  .dashboard-table .ant-table-tbody > tr > td:nth-child(5) { display: none; }
+  .dashboard-table .ant-table-thead > tr > th,
+  .dashboard-table .ant-table-tbody > tr > td { padding-inline: 10px; }
+  .dashboard-table .ant-table-thead > tr > th:first-child,
+  .dashboard-table .ant-table-tbody > tr > td:first-child { width: 43%; }
+  .dashboard-table .ant-table-thead > tr > th:nth-child(2),
+  .dashboard-table .ant-table-tbody > tr > td:nth-child(2) { width: 43%; }
+  .dashboard-table .ant-table-thead > tr > th:last-child,
+  .dashboard-table .ant-table-tbody > tr > td:last-child { width: 14%; }
+  .dashboard-table .position-cell { width: 100%; }
+  .dashboard-table .position-cell-title { font-size: 12px; }
+  .dashboard-table .company-name-row .ant-typography { font-size: 13px; }
+  .dashboard-table .company-category-badge { max-width: 100%; }
+
+  .dashboard-pagination {
+    min-height: 52px;
+    align-items: stretch !important;
+    padding: 10px 12px;
+  }
+  .dashboard-pagination > .ant-typography { display: none; }
+  .dashboard-pagination .pagination-controls { width: 100%; justify-content: center; }
+  .dashboard-pagination .ant-pagination { justify-content: center; flex-wrap: wrap; }
+  .dashboard-pagination .ant-pagination-options { display: none; }
+
+  .application-form-modal .ant-modal { width: calc(100vw - 20px) !important; max-width: none; margin: 10px auto; }
+  .application-form-heading .ant-typography-secondary { display: block; max-width: 260px; line-height: 1.45; }
+  .application-form-footer { justify-content: stretch; }
+  .application-form-footer .ant-btn { flex: 1 1 0; }
+  .application-import-modal .ant-modal { width: calc(100vw - 20px) !important; max-width: none; margin: 10px auto; }
+  .application-import-footer { justify-content: stretch; }
+  .application-import-footer .ant-btn { flex: 1 1 0; }
+}

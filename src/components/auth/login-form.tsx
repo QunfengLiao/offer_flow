@@ -39,7 +39,7 @@ export function LoginForm() {
       <Form.Item label="邮箱" name="email" rules={[{ required: true, message: "请输入邮箱" }, { type: "email", message: "请输入有效的邮箱地址" }]}>
         <Input type="email" autoComplete="email" placeholder="you@example.com" />
       </Form.Item>
-      <Form.Item label={<span style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>密码 <span style={{ color: "rgba(0, 0, 0, 0.45)", fontSize: 12, fontWeight: 400 }}>至少 8 个字符</span></span>} name="password" rules={[{ required: true, message: "请输入密码" }]}>
+      <Form.Item label="密码" name="password" rules={[{ required: true, message: "请输入密码" }]}>
         <Input.Password autoComplete="current-password" placeholder="输入密码" />
       </Form.Item>
       {serverError && <Alert showIcon type="error" message={serverError} style={{ marginBottom: 24 }} />}
