@@ -1,0 +1,23 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: qiu-zhao-tracker:latest
+    container_name: qiu-zhao-app
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+    ports:
+      - "3000:3000"
+    networks:
+      - existing-mysql
+
+networks:
+  existing-mysql:
+    external: true
+    name: qiu-zhao-network

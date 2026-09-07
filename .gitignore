@@ -1,0 +1,13 @@
+node_modules/
+.next/
+out/
+coverage/
+.env
+.env.production
+.env.local
+*.log
+prisma/dev.db
+.mysql-data/
+.mysql-runtime.log
+.mysql-runtime.err
+*.tsbuildinfo

@@ -1,0 +1,23 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: qiu-zhao-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: qiu_zhao_tracker
+      MYSQL_USER: qiu_user
+      MYSQL_PASSWORD: qiu_password
+      MYSQL_ROOT_PASSWORD: root_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - qiu_zhao_mysql_data:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/01-shadow.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_password"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  qiu_zhao_mysql_data:
