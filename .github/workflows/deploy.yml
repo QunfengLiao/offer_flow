@@ -26,12 +26,21 @@ jobs:
 
             cd /opt/offer_flow
 
-            echo "===== Pull latest code ====="
-            git fetch origin master
+            echo "===== Fetch latest code ====="
+            git fetch origin \
+              +refs/heads/master:refs/remotes/origin/master
+
+            echo "===== Reset to latest master ====="
             git reset --hard origin/master
 
+            echo "===== Current commit ====="
+            git log -1 --oneline
+
+            echo "===== Validate docker compose ====="
+            docker compose config >/dev/null
+
             echo "===== Build and start ====="
-            docker compose up -d --build
+            docker compose up -d --build --force-recreate
 
             echo "===== Cleanup ====="
             docker image prune -f
