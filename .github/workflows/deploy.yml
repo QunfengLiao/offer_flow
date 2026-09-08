@@ -1,131 +1,21 @@
-name: Deploy OfferFlow
+- name: Deploy to Tencent Cloud
+  uses: appleboy/ssh-action@v1
+  with:
+    host: ${{ secrets.SERVER_HOST }}
+    username: ${{ secrets.SERVER_USER }}
+    key: ${{ secrets.SERVER_SSH_KEY }}
+    port: 22
+    command_timeout: 30m
+    script: |
+      set -e
 
-on:
-  push:
-    branches:
-      - master
+      cd /opt/offer_flow
 
-permissions:
-  contents: read
+      git fetch origin master
+      git reset --hard origin/master
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
+      docker compose up -d --build
 
-    steps:
-      # 1. 拉取代码
-      - name: Checkout
-        uses: actions/checkout@v4
+      docker image prune -f
 
-      # 2. 登录腾讯云 TCR
-      - name: Login to Tencent TCR
-        uses: docker/login-action@v3
-        with:
-          registry: ccr.ccs.tencentyun.com
-          username: ${{ secrets.TCR_USERNAME }}
-          password: ${{ secrets.TCR_PASSWORD }}
-
-      # 3. 初始化 Docker Buildx
-      - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      # 4. 构建并推送到腾讯云 TCR
-      - name: Build and Push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: |
-            ccr.ccs.tencentyun.com/qunfeng-offerflow/offerflow:latest
-            ccr.ccs.tencentyun.com/qunfeng-offerflow/offerflow:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      # 5. 检查 SSH Secrets
-      - name: Check SSH Secrets
-        env:
-          SERVER_HOST: ${{ secrets.SERVER_HOST }}
-          SERVER_USER: ${{ secrets.SERVER_USER }}
-          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
-        run: |
-          if [ -z "$SERVER_HOST" ]; then
-            echo "SERVER_HOST is empty"
-            exit 1
-          fi
-
-          if [ -z "$SERVER_USER" ]; then
-            echo "SERVER_USER is empty"
-            exit 1
-          fi
-
-          if [ -z "$SERVER_SSH_KEY" ]; then
-            echo "SERVER_SSH_KEY is empty"
-            exit 1
-          fi
-
-          echo "SERVER_HOST exists"
-          echo "SERVER_USER exists"
-          echo "SERVER_SSH_KEY exists"
-          echo "SSH key length: ${#SERVER_SSH_KEY}"
-
-      # 6. 验证 SSH 私钥
-      - name: Validate SSH Private Key
-        env:
-          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
-        run: |
-          printf '%s\n' "$SERVER_SSH_KEY" > /tmp/offerflow_key
-          chmod 600 /tmp/offerflow_key
-
-          ssh-keygen -y -f /tmp/offerflow_key > /dev/null
-
-          echo "SSH private key is valid"
-
-      # 7. 测试 SSH 连接
-      - name: Test SSH Connection
-        env:
-          SERVER_HOST: ${{ secrets.SERVER_HOST }}
-          SERVER_USER: ${{ secrets.SERVER_USER }}
-        run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-
-          ssh-keyscan -H "$SERVER_HOST" >> ~/.ssh/known_hosts
-
-          ssh \
-            -i /tmp/offerflow_key \
-            -o BatchMode=yes \
-            -o IdentitiesOnly=yes \
-            -o ConnectTimeout=10 \
-            "$SERVER_USER@$SERVER_HOST" \
-            "echo 'SSH connection successful'"
-
-      # 8. SSH 到腾讯云服务器部署
-      - name: Deploy to Tencent Cloud
-        uses: appleboy/ssh-action@v1
-        env:
-          TCR_USERNAME: ${{ secrets.TCR_USERNAME }}
-          TCR_PASSWORD: ${{ secrets.TCR_PASSWORD }}
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          port: 22
-          command_timeout: 30m
-          envs: TCR_USERNAME,TCR_PASSWORD
-          script: |
-            set -e
-
-            echo "$TCR_PASSWORD" | docker login \
-              ccr.ccs.tencentyun.com \
-              --username "$TCR_USERNAME" \
-              --password-stdin
-
-            cd /opt/offer_flow
-
-            docker compose pull
-
-            docker compose up -d
-
-            docker image prune -f
-
-            docker ps --filter name=offerflow
+      docker ps --filter name=offerflow
