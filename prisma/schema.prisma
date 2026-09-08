@@ -75,7 +75,7 @@ model JobApplication {
   userId         String
   companyId      String
   companyName    String
-  applicationUrl String
+  applicationUrl String @db.VarChar(2048)
   appliedAt      DateTime
   currentStatus  ApplicationStatus  @default(APPLIED)
   // Materialized product-specific sort keys keep dashboard pagination in MySQL.
