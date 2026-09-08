@@ -21,7 +21,7 @@ export async function GET(request: Request) {
     const sortValue = searchParams.get("sort");
     const sort = ["statusPriority", "inactive", "companyName", "position", "appliedAt", "currentStatus", "lastActivityAt"].includes(sortValue || "")
       ? sortValue as ApplicationSort
-      : "inactive";
+      : "statusPriority";
     const direction = searchParams.get("direction") === "desc" ? "desc" : "asc";
     const result = await listApplicationsForUser(user.id, {
       query: searchParams.get("query")?.trim() || undefined,

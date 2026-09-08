@@ -39,6 +39,7 @@ type DashboardStats = {
 type ApplicationList = { items: ApplicationDto[]; total: number; favoriteCompanyCount: number; page: number; pageSize: number; pageCount: number };
 type DashboardFilter = ApplicationStatusFilter | "ALL";
 type AppliedDateFilter = { from: string; to: string; label: string };
+const DEFAULT_LIST_SORT: { sort: ApplicationSort; direction: "asc" } = { sort: "statusPriority", direction: "asc" };
 
 function relativeActivity(date: string) {
   const elapsedMinutes = Math.max(0, Math.floor((Date.now() - new Date(date).getTime()) / 60000));
@@ -238,8 +239,8 @@ export function DashboardClient({ user, initialStats, initialList, initialCatego
   const [categories, setCategories] = useState(initialCategories);
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [categoryManagerCreate, setCategoryManagerCreate] = useState(false);
-  const [sort, setSort] = useState<ApplicationSort>("statusPriority");
-  const [direction, setDirection] = useState<"asc" | "desc">("asc");
+  const [sort, setSort] = useState<ApplicationSort>(DEFAULT_LIST_SORT.sort);
+  const [direction, setDirection] = useState<"asc" | "desc">(DEFAULT_LIST_SORT.direction);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(initialList.pageSize);
   const [loading, setLoading] = useState(false);
@@ -252,7 +253,7 @@ export function DashboardClient({ user, initialStats, initialList, initialCatego
   const listRequestId = useRef(0);
   const detailRequestId = useRef(0);
   const recordsSectionRef = useRef<HTMLElement>(null);
-  const lastLoadedListState = useRef(`1|${initialList.pageSize}|statusPriority|asc|false|false|ALL|ALL|||`);
+  const lastLoadedListState = useRef(`1|${initialList.pageSize}|${DEFAULT_LIST_SORT.sort}|${DEFAULT_LIST_SORT.direction}|false|false|ALL|ALL|||`);
   const { message } = AntdApp.useApp();
 
   const loadDashboard = async () => {
@@ -352,8 +353,8 @@ export function DashboardClient({ user, initialStats, initialList, initialCatego
     setStatus("ALL");
     setAttention(next === "ATTENTION");
     setFavorite(next === "FAVORITES");
-    setSort("statusPriority");
-    setDirection("asc");
+    setSort(DEFAULT_LIST_SORT.sort);
+    setDirection(DEFAULT_LIST_SORT.direction);
     setPage(1);
   };
   const updateCompany = async (application: ApplicationDto, patch: { categoryId?: string | null; isFavorite?: boolean }, categoryOverride?: CompanyCategoryDto | null) => {
@@ -398,8 +399,8 @@ export function DashboardClient({ user, initialStats, initialList, initialCatego
     const sortKey = activeSorter?.columnKey;
     const sortableFields: ApplicationSort[] = ["inactive", "companyName", "position", "appliedAt", "currentStatus", "lastActivityAt"];
     if (!activeSorter?.order || typeof sortKey !== "string" || !sortableFields.includes(sortKey as ApplicationSort)) {
-      setSort("statusPriority");
-      setDirection("asc");
+      setSort(DEFAULT_LIST_SORT.sort);
+      setDirection(DEFAULT_LIST_SORT.direction);
       setPage(1);
       return;
     }

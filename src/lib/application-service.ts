@@ -399,7 +399,7 @@ export async function listApplicationsForUser(userId: string, options: ListOptio
       ? [{ appliedAt: direction === "asc" ? "desc" : "asc" }, { id: "asc" }]
     : options.sort === "lastActivityAt"
       ? [{ lastActivityAt: direction }, { id: "asc" }]
-      : [{ createdAt: "desc" }, { id: "asc" }];
+      : [{ statusPriority: "asc" }, { appliedAt: "desc" }, { companyName: "asc" }, { id: "asc" }];
 
   // The count and page do not require write consistency. Run them in parallel so
   // a remote database does not pay transaction begin/commit and serial round trips.
