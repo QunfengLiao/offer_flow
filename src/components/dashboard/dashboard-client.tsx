@@ -352,8 +352,8 @@ export function DashboardClient({ user, initialStats, initialList, initialCatego
     setStatus("ALL");
     setAttention(next === "ATTENTION");
     setFavorite(next === "FAVORITES");
-    setSort("inactive");
-    setDirection(next === "ATTENTION" ? "desc" : "asc");
+    setSort("statusPriority");
+    setDirection("asc");
     setPage(1);
   };
   const updateCompany = async (application: ApplicationDto, patch: { categoryId?: string | null; isFavorite?: boolean }, categoryOverride?: CompanyCategoryDto | null) => {
@@ -526,7 +526,7 @@ export function DashboardClient({ user, initialStats, initialList, initialCatego
                 </div>
               </div>
             </div>
-            {attention && <div className="attention-filter-note">显示尚未结束且超过 7 天没有动态的投递，按无动态天数从高到低排列。</div>}
+            {attention && <div className="attention-filter-note">显示尚未结束且超过 7 天没有动态的投递，按当前状态优先级排列。</div>}
             {hasFilterSummary && <div className="dashboard-filter-summary"><Space wrap size={[8, 8]}>
               {query.trim() && <Tag closable onClose={() => { setQuery(""); setPage(1); }}>搜索：{query.trim()}</Tag>}
               {status !== "ALL" && <Tag closable onClose={() => { setStatus("ALL"); setPage(1); }}>状态：{statusFilterLabel(status)}</Tag>}

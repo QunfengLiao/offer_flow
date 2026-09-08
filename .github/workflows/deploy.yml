@@ -7,38 +7,41 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. 拉取代码
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Login to GHCR
+      # 2. 登录腾讯云 TCR
+      - name: Login to Tencent TCR
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: ccr.ccs.tencentyun.com
+          username: ${{ secrets.TCR_USERNAME }}
+          password: ${{ secrets.TCR_PASSWORD }}
 
+      # 3. 初始化 Docker Buildx
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # 4. 构建并推送到腾讯云 TCR
       - name: Build and Push
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           tags: |
-            ghcr.io/qunfengliao/offer_flow:latest
-            ghcr.io/qunfengliao/offer_flow:${{ github.sha }}
+            ccr.ccs.tencentyun.com/qunfeng-offerflow/offerflow:latest
+            ccr.ccs.tencentyun.com/qunfeng-offerflow/offerflow:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # 1. 检查 GitHub Secrets 是否真的存在
+      # 5. 检查 SSH Secrets
       - name: Check SSH Secrets
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
@@ -65,7 +68,7 @@ jobs:
           echo "SERVER_SSH_KEY exists"
           echo "SSH key length: ${#SERVER_SSH_KEY}"
 
-      # 2. 验证 GitHub 中保存的是不是合法私钥
+      # 6. 验证 SSH 私钥
       - name: Validate SSH Private Key
         env:
           SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
@@ -77,7 +80,7 @@ jobs:
 
           echo "SSH private key is valid"
 
-      # 3. 不经过 appleboy，直接测试 GitHub Runner 能不能 SSH 到服务器
+      # 7. 测试 SSH 连接
       - name: Test SSH Connection
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
@@ -96,15 +99,27 @@ jobs:
             "$SERVER_USER@$SERVER_HOST" \
             "echo 'SSH connection successful'"
 
-      # 4. 正式部署
-      - name: Deploy to Server
+      # 8. SSH 到腾讯云服务器部署
+      - name: Deploy to Tencent Cloud
         uses: appleboy/ssh-action@v1
+        env:
+          TCR_USERNAME: ${{ secrets.TCR_USERNAME }}
+          TCR_PASSWORD: ${{ secrets.TCR_PASSWORD }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: 22
+          command_timeout: 30m
+          envs: TCR_USERNAME,TCR_PASSWORD
           script: |
+            set -e
+
+            echo "$TCR_PASSWORD" | docker login \
+              ccr.ccs.tencentyun.com \
+              --username "$TCR_USERNAME" \
+              --password-stdin
+
             cd /opt/offer_flow
 
             docker compose pull
